@@ -1,64 +1,74 @@
-class MembersController < ApplicationController
-  before_action :authenticate_user!, except: [:opened]
+class CampaignsController < ApplicationController
+  before_action :authenticate_user!
 
-  before_action :set_member, only: [:show, :destroy, :update]
-  before_action :is_owner?, only: [:destroy, :update]
-  before_action :set_member_by_token, only: [:opened]
+  before_action :set_campaign, only: [:show, :destroy, :update, :raffle]
+  before_action :is_owner?, only: [:show, :destroy, :update, :raffle]
+
+  def show
+  end
+
+  def index
+    @campaigns = current_user.campaigns
+  end
 
   def create
-    @member = Member.new(member_params)
+    @campaign = Campaign.new(user: current_user, title: 'Nova Campanha', description: 'Descreva sua campanha...')
 
     respond_to do |format|
-      if @member.save
+      if @campaign.save
+        format.html { redirect_to "/campaigns/#{@campaign.id}" }
+      else
+        format.html { redirect_to main_app.root_url, notice: @campaign.errors }
+      end
+    end
+  end
+
+  def update
+    respond_to do |format|
+      if @campaign.update(campaign_params)
         format.json { render json: true }
       else
-        format.json { render json: @member.errors, status: :unprocessable_entity }
+        format.json { render json: @campaign.errors, status: :unprocessable_entity }
       end
     end
   end
 
   def destroy
-    @member.destroy
+    @campaign.destroy
 
     respond_to do |format|
       format.json { render json: true }
     end
   end
 
-  def update
+  def raffle
     respond_to do |format|
-      if @member.update(member_params)
-        format.json { render json: true }
+      if @campaign.status != "pending"
+        format.json { render json: 'Já foi sorteada', status: :unprocessable_entity }
+      elsif @campaign.members.count < 3
+        format.json { render json: 'A campanha precisa de pelo menos 3 pessoas', status: :unprocessable_entity }
       else
-        format.json { render json: @member.errors, status: :unprocessable_entity }
+        CampaignRaffleJob.perform_later @campaign
+        format.json { render json: true }
       end
     end
   end
 
-  def opened
-    @member.update(open: true)
-    gif = Base64.decode64("R0lGODlhAQABAPAAAAAAAAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
-    render text: gif, type: 'image/gif'
-  end
-
   private
 
-  def set_member
-    @member = Member.find(params[:id])
+  def set_campaign
+    @campaign = Campaign.find(params[:id])
   end
 
-  def set_member_by_token
-    @member = Member.find_by!(token: params[:token])
-  end
-
-  def member_params
-    params.require(:member).permit(:name, :email, :campaign_id)
+  def campaign_params
+    params.require(:campaign).permit(:title, :description, :event_date, :event_hour, :location).merge(user: current_user)
   end
 
   def is_owner?
-    unless current_user == @member.campaign.user
+    unless current_user == @campaign.user
       respond_to do |format|
         format.json { render json: false, status: :forbidden }
+        format.html { redirect_to main_app.root_url }
       end
     end
   end
