@@ -42,6 +42,9 @@ gem 'redis'
 gem 'sidekiq', '5.2.7'
 # gem 'sidekiq'
 
+gem 'inky-rb', require: 'inky'
+gem 'premailer-rails'
+
 group :development, :test do
   gem 'rspec-rails', '~> 3.5'
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
